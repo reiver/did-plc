@@ -1,0 +1,1950 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" vocab="https://schema.org/" typeof="TechArticle" class="article">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="/text-readability/readmode.css" />
+<title>DID-PLC</title>
+<meta name="author" content="Charles Iliya Krempeaux" />
+<meta name="category" content="at protocol" />
+<meta name="category" content="atproto" />
+<meta name="category" content="bluesky" />
+<meta name="category" content="dag-cbor" />
+<meta name="category" content="decentralized identifier" />
+<meta name="category" content="did" />
+<meta name="category" content="did:key" />
+<meta name="category" content="did:plc" />
+<meta name="category" content="go" />
+<meta name="category" content="golang" />
+<meta name="category" content="plc.directory" />
+<meta name="category" content="public ledger of credentials" />
+</head>
+<body>
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+	<ol>
+		<li><a href="/">Home</a></li>
+		<li><a href="./" aria-current="page">DID-PLC</a></li>
+	</ol>
+</nav>
+
+<main>
+<article>
+	<header>
+		<hgroup>
+			<h1 property="headline">DID-PLC</h1>
+			<p>
+				the most popular DID used by ATProto
+			</p>
+		</hgroup>
+		<p>
+			by <a href="https://reiver.link/">Charles Iliya Krempeaux</a>
+		</p>
+	</header>
+	<p>
+		What is <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong>‽
+	</p>
+	<p>
+		If you have used <strong>Bluesky</strong>, or anything else built on <strong><abbr title="Authenticated Transfer Protocol">ATProto</abbr></strong> (the <em>Authenticated Transfer Protocol</em>), then you have probably seen something like this:
+	</p>
+	<figure>
+		<pre><code>
+did:plc:ewvi7nxzyoun6zhxrhs64oiz
+		</code></pre>
+	</figure>
+	<p>
+		That is a <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong>.
+		(This particular one belongs to the account with the handle <code>@atproto.com</code>.)
+	</p>
+	<p>
+		The most succinct way I can think of to explain <em>what a <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong> is</em> is:
+	</p>
+	<p>
+		🠶 a permanent identifier for an account, whose “code” is (the first part of) a hash of the account's first signed operation
+	</p>
+	<p>
+		But that lacks context.
+		What is a <abbr title="Decentralized Identifier">DID</abbr>?
+		What is an “operation”?
+		What exactly gets hashed, and how?
+		And, where do these things live?
+	</p>
+	<p>
+		This article answers those questions.
+		It is written for programmers who want to create <strong><abbr title="Authenticated Transfer Protocol">ATProto</abbr></strong> apps.
+		And, after reading it, you should:
+	</p>
+	<ul>
+		<li>understand what the code (i.e., what is after the <code>did:plc:</code>) of a <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong> is,</li>
+		<li>be able to write a program that generates that code,</li>
+		<li>be able to get information from <strong>plc.directory</strong>,</li>
+		<li>and, be able to add a new <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong> to <strong>plc.directory</strong>.</li>
+	</ul>
+	<p>
+		The programming examples are in the <strong>Go</strong> programming-language (<strong><abbr title="Go programming-language">Golang</abbr></strong>).
+		And, they only use Go's standard library.
+	</p>
+	<p>
+		<strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong> is also written as <code>did:plc</code>.
+		And, <abbr title="Public Ledger of Credentials">PLC</abbr> stands for <em>Public Ledger of Credentials</em>.
+	</p>
+	<section>
+		<h1><abbr title="Decentralized Identifier">DID</abbr></h1>
+		<p>
+			Before we can talk about <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong>, we need to talk about <strong><abbr title="Decentralized Identifier">DID</abbr>s</strong>.
+		</p>
+		<p>
+			<strong><abbr title="Decentralized Identifier">DID</abbr></strong> is short for <em>Decentralized Identifier</em>.
+			<strong><abbr title="Decentralized Identifier">DID</abbr>s</strong> are a <abbr title="World Wide Web Consortium">W3C</abbr> standard.
+			<cite>Decentralized Identifiers (DIDs) v1.0</cite> became a <abbr title="World Wide Web Consortium">W3C</abbr> Recommendation on 19 July 2022.
+		</p>
+		<p>
+			A <strong><abbr title="Decentralized Identifier">DID</abbr></strong> is a type of <abbr title="Uniform Resource Identifier">URI</abbr>.
+			It always starts with <code>did:</code>.
+			After that comes the name of a <strong><abbr title="Decentralized Identifier">DID</abbr> method</strong>.
+			And, after that comes an identifier, whose format is decided by that <strong><abbr title="Decentralized Identifier">DID</abbr> method</strong>.
+		</p>
+		<figure>
+			<pre><code>
+did:plc:ewvi7nxzyoun6zhxrhs64oiz
+└┬┘ └┬┘ └──────────┬───────────┘
+ │   │             │
+ │   │             └── identifier (the “code”)
+ │   │
+ │   └── DID method
+ │
+ └── scheme
+			</code></pre>
+			<figcaption>
+				The 3 parts of a <abbr title="Decentralized Identifier">DID</abbr>.
+			</figcaption>
+		</figure>
+		<p>
+			There are many <strong><abbr title="Decentralized Identifier">DID</abbr> methods</strong>.
+			For example:
+			<code>did:web</code>,
+			<code>did:key</code>,
+			<code>did:plc</code>,
+			and many more.
+		</p>
+		<p>
+			A <strong><abbr title="Decentralized Identifier">DID</abbr></strong> by itself is just a name.
+			What makes it useful is that it can be <strong>resolved</strong> to a <strong><abbr title="Decentralized Identifier">DID</abbr> document</strong>
+			—
+			a <abbr title="JavaScript Object Notation">JSON</abbr> document that says things about the thing that the <abbr title="Decentralized Identifier">DID</abbr> identifies.
+			Such as: what public-keys it uses, what other names it is known by, and what services it uses.
+		</p>
+		<p>
+			Each <strong><abbr title="Decentralized Identifier">DID</abbr> method</strong> has its own way of <em>resolving</em> a <abbr title="Decentralized Identifier">DID</abbr> into a <abbr title="Decentralized Identifier">DID</abbr> document.
+			For example, <code>did:web</code> uses <abbr title="HyperText Transfer Protocol Secure">HTTPS</abbr> and <abbr title="Domain Name System">DNS</abbr>.
+			And, <code>did:plc</code> uses a <strong>directory server</strong> (such as <strong>plc.directory</strong>).
+		</p>
+		<p>
+			(<abbr title="Decentralized Identifier">DID</abbr>s are designed to be <em>permanent</em> identifiers.
+			Things you might think of as an “identity” — such as a handle, a server, or a key — can change.
+			The <abbr title="Decentralized Identifier">DID</abbr> stays the same.)
+		</p>
+	</section>
+	<section>
+		<h1><abbr title="Decentralized Identifier">DID</abbr>s in <abbr title="Authenticated Transfer Protocol">ATProto</abbr></h1>
+		<p>
+			In <strong><abbr title="Authenticated Transfer Protocol">ATProto</abbr></strong>, every account is identified by a <strong><abbr title="Decentralized Identifier">DID</abbr></strong>.
+			Your <em>handle</em> (such as <code>@atproto.com</code> or <code>@alice.bsky.social</code>) can change.
+			The server that hosts your data (your <strong><abbr title="Personal Data Server">PDS</abbr></strong>, short for <em>Personal Data Server</em>) can change.
+			Your <abbr title="Decentralized Identifier">DID</abbr> does <strong>not</strong> change.
+		</p>
+		<p>
+			<strong><abbr title="Authenticated Transfer Protocol">ATProto</abbr></strong> currently supports two <strong><abbr title="Decentralized Identifier">DID</abbr> methods</strong>:
+		</p>
+		<ul>
+			<li><code>did:plc</code></li>
+			<li><code>did:web</code></li>
+		</ul>
+		<p>
+			Almost all <strong><abbr title="Authenticated Transfer Protocol">ATProto</abbr></strong> accounts use <code>did:plc</code>.
+			As of this writing, more-than 40 million <code>did:plc</code> identifiers have been registered.
+		</p>
+		<p>
+			For <strong><abbr title="Authenticated Transfer Protocol">ATProto</abbr></strong>, a <abbr title="Decentralized Identifier">DID</abbr> document tells you 3 important things about an account:
+		</p>
+		<dl>
+			<dt>handle</dt>
+			<dd>
+				<p>
+					found in <code>alsoKnownAs</code>, as an <code>at://</code> <abbr title="Uniform Resource Identifier">URI</abbr>.
+					For example, <code>at://atproto.com</code>.
+				</p>
+			</dd>
+
+			<dt>signing-key</dt>
+			<dd>
+				<p>
+					found in <code>verificationMethod</code>, with an <code>id</code> ending in <code>#atproto</code>.
+					This is the public-key used to verify the account's data (its repository).
+				</p>
+			</dd>
+
+			<dt><abbr title="Personal Data Server">PDS</abbr></dt>
+			<dd>
+				<p>
+					found in <code>service</code>, with an <code>id</code> ending in <code>#atproto_pds</code>.
+					This is the <abbr title="Uniform Resource Locator">URL</abbr> of the server that hosts the account's data.
+				</p>
+			</dd>
+		</dl>
+		<p>
+			For example, here is the <abbr title="Decentralized Identifier">DID</abbr> document for <code>did:plc:ewvi7nxzyoun6zhxrhs64oiz</code>:
+		</p>
+		<figure>
+			<pre><code>
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    "https://w3id.org/security/multikey/v1",
+    "https://w3id.org/security/suites/secp256k1-2019/v1"
+  ],
+  "id": "did:plc:ewvi7nxzyoun6zhxrhs64oiz",
+  "alsoKnownAs": [
+    "at://atproto.com"
+  ],
+  "verificationMethod": [
+    {
+      "id": "did:plc:ewvi7nxzyoun6zhxrhs64oiz#atproto",
+      "type": "Multikey",
+      "controller": "did:plc:ewvi7nxzyoun6zhxrhs64oiz",
+      "publicKeyMultibase": "zQ3shunBKsXixLxKtC5qeSG9E4J5RkGN57im31pcTzbNQnm5w"
+    }
+  ],
+  "service": [
+    {
+      "id": "#atproto_pds",
+      "type": "AtprotoPersonalDataServer",
+      "serviceEndpoint": "https://enoki.us-east.host.bsky.network"
+    }
+  ]
+}
+			</code></pre>
+			<figcaption>
+				The <abbr title="Decentralized Identifier">DID</abbr> document for <code>did:plc:ewvi7nxzyoun6zhxrhs64oiz</code> (<code>@atproto.com</code>), from <code>https://plc.directory/did:plc:ewvi7nxzyoun6zhxrhs64oiz</code>.
+			</figcaption>
+		</figure>
+	</section>
+	<section>
+		<h1>Anatomy of a <abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></h1>
+		<p>
+			Every <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong> has the same shape:
+		</p>
+		<ul>
+			<li>it starts with <code>did:plc:</code> (8 characters),</li>
+			<li>followed by exactly 24 characters (the “code”),</li>
+			<li>for a total of 32 characters.</li>
+		</ul>
+		<p>
+			The 24 characters of the code only come from the (lower-case) <strong>base32</strong> alphabet:
+		</p>
+		<figure>
+			<pre><code>
+abcdefghijklmnopqrstuvwxyz234567
+			</code></pre>
+			<figcaption>
+				The 32 characters of the (lower-case) base32 alphabet.
+			</figcaption>
+		</figure>
+		<p>
+			I.e., the lower-case letters <code>a</code> to <code>z</code>, and the Arabic-numerals <code>2</code> to <code>7</code>.
+			Note that there is <strong>no</strong> <code>0</code>, <code>1</code>, <code>8</code>, or <code>9</code> in a <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong>.
+			And, it is always lower-case.
+		</p>
+		<p>
+			So, a regular-expression that matches a <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong> is:
+		</p>
+		<figure>
+			<pre><code>
+^did:plc:[a-z2-7]{24}$
+			</code></pre>
+			<figcaption>
+				This is the same regular-expression that the reference <abbr title="Public Ledger of Credentials">PLC</abbr> directory server uses.
+			</figcaption>
+		</figure>
+		<p>
+			Each base32 character holds 5 bits.
+			So, the 24 characters of the code hold 120 bits.
+		</p>
+	</section>
+	<section>
+		<h1>The Code</h1>
+		<p>
+			So, what is the code‽
+			Where do those 24 characters come from?
+		</p>
+		<p>
+			The code is:
+		</p>
+		<p>
+			🠶 the first 24 characters of the base32 encoding of the <abbr title="Secure Hash Algorithm 256">SHA-256</abbr> hash of the <abbr title="Directed Acyclic Graph — Concise Binary Object Representation">DAG-CBOR</abbr> encoding of the <strong>signed genesis operation</strong>
+		</p>
+		<p>
+			Or, as pseudo-code:
+		</p>
+		<figure>
+			<pre><code>
+"did:plc:" + base32(sha256(dagcbor(signedGenesisOperation)))[0:24]
+			</code></pre>
+		</figure>
+		<p>
+			That is a mouthful.
+			So, let's go through it, piece by piece.
+		</p>
+		<p>
+			Every <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong> has a log of <strong>operations</strong>.
+			An <strong>operation</strong> is a small (signed) <abbr title="JavaScript Object Notation">JSON</abbr> object that says what the handle, keys, and services of the account are.
+			Every time one of those changes, a new operation is added to the log.
+		</p>
+		<p>
+			The very first operation in the log is called the <strong>genesis operation</strong>.
+			And, the <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong> is made from it.
+			Like this:
+		</p>
+		<figure>
+			<pre><code>
+signed genesis operation (JSON)
+        │
+        │  encode as DAG-CBOR
+        ↓
+464 bytes
+        │
+        │  SHA-256
+        ↓
+32 bytes:   25aa8fb6f9c3a8df64f789e5ee3919ade65dda4c382ff3f69438428f3c1b2914
+        │
+        │  base32 (lower-case, no padding)
+        ↓
+52 chars:   ewvi7nxzyoun6zhxrhs64oizvxtf3wsmhax7h5uuhbbi6pa3feka
+        │
+        │  keep the first 24 characters
+        ↓
+24 chars:   ewvi7nxzyoun6zhxrhs64oiz
+        │
+        │  put "did:plc:" in front
+        ↓
+did:plc:ewvi7nxzyoun6zhxrhs64oiz
+			</code></pre>
+			<figcaption>
+				How <code>did:plc:ewvi7nxzyoun6zhxrhs64oiz</code> was made from its genesis operation.
+				(These are the real values.)
+			</figcaption>
+		</figure>
+		<p>
+			Here is the genesis operation that was used to make <code>did:plc:ewvi7nxzyoun6zhxrhs64oiz</code>:
+		</p>
+		<figure>
+			<pre><code>
+{
+  "sig": "lza4at_jCtGo_TYgL5PC1ZNP7lhF4DV8H50LWHhvdHcB143x1wEwqZ43xvV36Pws6OOnJLJrkibEUFDFqkhIhg",
+  "prev": null,
+  "type": "plc_operation",
+  "services": {
+    "atproto_pds": {
+      "type": "AtprotoPersonalDataServer",
+      "endpoint": "https://bsky.social"
+    }
+  },
+  "alsoKnownAs": [
+    "at://atprotocol.bsky.social"
+  ],
+  "rotationKeys": [
+    "did:key:zQ3shhCGUqDKjStzuDxPkTxN6ujddP4RkEKJJouJGRRkaLGbg",
+    "did:key:zQ3shpKnbdPx3g3CmPf5cRVTPe1HtSwVn5ish3wSnDPQCbLJK"
+  ],
+  "verificationMethods": {
+    "atproto": "did:key:zQ3shXjHeiBuRCKmM36cuYnm7YEMzhGnCmCyW92sRJ9pribSF"
+  }
+}
+			</code></pre>
+			<figcaption>
+				The genesis operation of <code>did:plc:ewvi7nxzyoun6zhxrhs64oiz</code>, created 2023-04-26.
+			</figcaption>
+		</figure>
+		<p>
+			(Notice that the handle back then was <code>at://atprotocol.bsky.social</code> and not <code>at://atproto.com</code>.
+			The handle changed later.
+			The <abbr title="Decentralized Identifier">DID</abbr> did <strong>not</strong>.)
+		</p>
+		<p>
+			The <abbr title="Secure Hash Algorithm 256">SHA-256</abbr> hash is 256 bits.
+			Its base32 encoding is 52 characters.
+			But only the first 24 characters (120 bits) are used.
+			The rest are thrown away.
+		</p>
+		<p>
+			Notice that the <code>sig</code> (the signature) is <em>part of</em> what gets hashed.
+			This has a surprising consequence.
+			The signature algorithm used (<abbr title="Elliptic Curve Digital Signature Algorithm">ECDSA</abbr>) is usually <em>randomized</em>.
+			So, if you sign the <em>exact same</em> genesis operation twice, you (usually) get 2 different signatures
+			—
+			and thus 2 different <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr>s</strong>.
+		</p>
+	</section>
+	<section>
+		<h1>Self-Certifying</h1>
+		<p>
+			Because the code is a hash of the genesis operation, a <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong> is <strong>self-certifying</strong>.
+		</p>
+		<p>
+			Anyone can get the genesis operation from the directory, hash it, and check that the result matches the <abbr title="Decentralized Identifier">DID</abbr>.
+			The directory cannot make up a different genesis operation for a <abbr title="Decentralized Identifier">DID</abbr>
+			—
+			because it would have a different hash.
+		</p>
+		<p>
+			And, because the genesis operation is <em>signed</em> by one of the keys listed inside of it, and every later operation is signed by a key from the operation before it, the whole log of operations can be checked.
+			Nobody needs to trust the directory to tell the truth about who controls a <abbr title="Decentralized Identifier">DID</abbr>.
+		</p>
+	</section>
+	<section>
+		<h1>Operations</h1>
+		<p>
+			A (regular) operation has the following fields:
+		</p>
+		<dl>
+			<dt><code>type</code></dt>
+			<dd>
+				<p>
+					always the string <code>"plc_operation"</code>.
+				</p>
+			</dd>
+
+			<dt><code>rotationKeys</code></dt>
+			<dd>
+				<p>
+					an array of public-keys (as <code>did:key</code> strings).
+					These are the keys that <em>control</em> the <abbr title="Decentralized Identifier">DID</abbr>.
+					Only these keys can sign the next operation.
+					They are listed in order of <em>descending authority</em> — the first key has the most authority.
+					(At least 1 key.)
+				</p>
+			</dd>
+
+			<dt><code>verificationMethods</code></dt>
+			<dd>
+				<p>
+					a map of names to public-keys (as <code>did:key</code> strings).
+					For <strong><abbr title="Authenticated Transfer Protocol">ATProto</abbr></strong>, the name is <code>atproto</code>, and the key is the account's <em>signing-key</em>.
+				</p>
+			</dd>
+
+			<dt><code>alsoKnownAs</code></dt>
+			<dd>
+				<p>
+					an array of <abbr title="Uniform Resource Identifier">URI</abbr>s.
+					For <strong><abbr title="Authenticated Transfer Protocol">ATProto</abbr></strong>, this includes the handle, as an <code>at://</code> <abbr title="Uniform Resource Identifier">URI</abbr>.
+				</p>
+			</dd>
+
+			<dt><code>services</code></dt>
+			<dd>
+				<p>
+					a map of names to services, where each service has a <code>type</code> and an <code>endpoint</code>.
+					For <strong><abbr title="Authenticated Transfer Protocol">ATProto</abbr></strong>, the name is <code>atproto_pds</code>, the type is <code>AtprotoPersonalDataServer</code>, and the endpoint is the <abbr title="Uniform Resource Locator">URL</abbr> of the account's <abbr title="Personal Data Server">PDS</abbr>.
+				</p>
+			</dd>
+
+			<dt><code>prev</code></dt>
+			<dd>
+				<p>
+					the <abbr title="Content Identifier">CID</abbr> (a type of hash) of the previous operation.
+					For the genesis operation, it is <code>null</code>.
+					(It must be there, with the value <code>null</code>. It cannot be left out.)
+				</p>
+			</dd>
+
+			<dt><code>sig</code></dt>
+			<dd>
+				<p>
+					the signature of the operation.
+				</p>
+			</dd>
+		</dl>
+		<p>
+			Note that the names in <code>verificationMethods</code> and <code>services</code> do <strong>not</strong> start with <code>#</code>.
+			The <code>#</code> gets added when the <abbr title="Decentralized Identifier">DID</abbr> document is made.
+		</p>
+		<p>
+			Also note that the operation is <em>not</em> the <abbr title="Decentralized Identifier">DID</abbr> document.
+			The directory turns the most recent operation into a <abbr title="Decentralized Identifier">DID</abbr> document when someone asks for it.
+			(And, the <code>rotationKeys</code> are <strong>not</strong> included in the <abbr title="Decentralized Identifier">DID</abbr> document.)
+		</p>
+		<p>
+			There are 2 other types of operations:
+			<code>plc_tombstone</code> and the legacy <code>create</code>.
+			We will get to those later.
+		</p>
+	</section>
+	<section>
+		<h1>Rotation-Keys versus Signing-Key</h1>
+		<p>
+			A <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong> has 2 different kinds of keys.
+			And, it is important to not confuse them:
+		</p>
+		<dl>
+			<dt>rotation-keys</dt>
+			<dd>
+				<p>
+					in <code>rotationKeys</code>.
+					These control the <abbr title="Decentralized Identifier">DID</abbr> itself.
+					Whoever has the private-key for a rotation-key can change the handle, the <abbr title="Personal Data Server">PDS</abbr>, the signing-key, and even the rotation-keys.
+					They are only used to sign <abbr title="Public Ledger of Credentials">PLC</abbr> operations.
+				</p>
+			</dd>
+
+			<dt>signing-key</dt>
+			<dd>
+				<p>
+					in <code>verificationMethods</code> (as <code>atproto</code>).
+					This is used by the <abbr title="Personal Data Server">PDS</abbr> to sign the account's data (its repository).
+					It has <strong>no</strong> control over the <abbr title="Decentralized Identifier">DID</abbr> (unless it is also listed as a rotation-key).
+				</p>
+			</dd>
+		</dl>
+		<p>
+			Best practice is to keep these separate
+			—
+			i.e., do <strong>not</strong> use the same key as both a rotation-key and a signing-key.
+		</p>
+		<p>
+			For a typical Bluesky account, the <abbr title="Personal Data Server">PDS</abbr> holds both the signing-key and a rotation-key.
+			A user can also add their own rotation-key (with more authority) so that they can recover their account without the <abbr title="Personal Data Server">PDS</abbr>'s help.
+		</p>
+	</section>
+	<section>
+		<h1>Handles and <code>alsoKnownAs</code></h1>
+		<p>
+			The handle in <code>alsoKnownAs</code> is a <em>claim</em>.
+			The directory does <strong>not</strong> check it.
+			Anyone can create a <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong> that says <code>at://atproto.com</code>.
+		</p>
+		<p>
+			So, an <strong><abbr title="Authenticated Transfer Protocol">ATProto</abbr></strong> app must verify a handle <strong>bi-directionally</strong>:
+		</p>
+		<ol>
+			<li>the <abbr title="Decentralized Identifier">DID</abbr> document must claim the handle (in <code>alsoKnownAs</code>), and</li>
+			<li>the handle must point back to the <abbr title="Decentralized Identifier">DID</abbr> — either with a <abbr title="Domain Name System">DNS</abbr> <code>TXT</code> record at <code>_atproto.&lt;handle&gt;</code> with the value <code>did=&lt;DID&gt;</code>, or with an <abbr title="HyperText Transfer Protocol Secure">HTTPS</abbr> response from <code>https://&lt;handle&gt;/.well-known/atproto-did</code> whose body is the <abbr title="Decentralized Identifier">DID</abbr>.</li>
+		</ol>
+		<p>
+			Only when both directions agree should the handle be trusted.
+		</p>
+	</section>
+	<section>
+		<h1><code>did:key</code></h1>
+		<p>
+			The public-keys in an operation are written as <strong><code>did:key</code></strong> strings.
+			(Yes, <code>did:key</code> is another <strong><abbr title="Decentralized Identifier">DID</abbr> method</strong>
+			—
+			one where the identifier <em>is</em> the public-key.)
+		</p>
+		<p>
+			For example:
+		</p>
+		<figure>
+			<pre><code>
+did:key:zDnaerA2eh5cypdtzchoL1z4epa5ukFG3YPd2ouhjKb9ZtcsE
+did:key:zQ3shunBKsXixLxKtC5qeSG9E4J5RkGN57im31pcTzbNQnm5w
+			</code></pre>
+			<figcaption>
+				A P-256 public-key (top), and a k256 public-key (bottom), as <code>did:key</code> strings.
+			</figcaption>
+		</figure>
+		<p>
+			<strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong> rotation-keys can be one of 2 types of elliptic-curve keys:
+		</p>
+		<ul>
+			<li><strong>P-256</strong> (also known as <em><abbr title="National Institute of Standards and Technology">NIST</abbr> P-256</em>, <em>secp256r1</em>, or <em>prime256v1</em>), and</li>
+			<li><strong>k256</strong> (also known as <em>secp256k1</em> — the curve that Bitcoin uses).</li>
+		</ul>
+		<p>
+			A <code>did:key</code> for these is made like this:
+		</p>
+		<figure>
+			<pre><code>
+public-key
+    │
+    │  compress the elliptic-curve point (33 bytes)
+    ↓
+02 or 03, followed by the 32 bytes of X
+    │
+    │  put the multicodec prefix in front
+    │      P-256: 0x80 0x24    (0x1200 as a varint)
+    │      k256:  0xe7 0x01    (0xe7 as a varint)
+    ↓
+35 bytes
+    │
+    │  base58btc
+    ↓
+put "did:key:z" in front ("z" means base58btc)
+			</code></pre>
+		</figure>
+		<p>
+			Because of the multicodec prefix, P-256 keys always start with <code>did:key:zDn</code>, and k256 keys always start with <code>did:key:zQ3s</code>.
+			So, you can tell what type of key it is by just looking at it.
+		</p>
+	</section>
+	<section>
+		<h1><abbr title="Directed Acyclic Graph — Concise Binary Object Representation">DAG-CBOR</abbr></h1>
+		<p>
+			Operations are sent to (and received from) the directory as <abbr title="JavaScript Object Notation">JSON</abbr>.
+			But they are <em>signed</em> and <em>hashed</em> as <strong><abbr title="Directed Acyclic Graph — Concise Binary Object Representation">DAG-CBOR</abbr></strong>.
+		</p>
+		<p>
+			Why‽
+			Because <abbr title="JavaScript Object Notation">JSON</abbr> can be written many different ways
+			—
+			with different spacing, with different key orders, etc.
+			And, to hash or sign something, everyone must agree on the exact bytes.
+		</p>
+		<p>
+			<strong><abbr title="Concise Binary Object Representation">CBOR</abbr></strong> (short for <em>Concise Binary Object Representation</em>, <abbr title="Request for Comments">RFC</abbr>-8949) is a binary format similar to <abbr title="JavaScript Object Notation">JSON</abbr>.
+			<strong><abbr title="Directed Acyclic Graph — Concise Binary Object Representation">DAG-CBOR</abbr></strong> is a strict subset of <abbr title="Concise Binary Object Representation">CBOR</abbr> (from <abbr title="InterPlanetary Linked Data">IPLD</abbr>) where there is only <em>one</em> way to encode any value.
+			The rules that matter for <abbr title="Public Ledger of Credentials">PLC</abbr> operations are:
+		</p>
+		<ul>
+			<li>lengths are encoded using as few bytes as possible,</li>
+			<li>lengths are always given up-front (no “indefinite-length” items),</li>
+			<li>map keys are sorted — <em>shorter keys first</em>, and keys of the same length sorted byte-wise.</li>
+		</ul>
+		<p>
+			That last rule means that the keys of an operation are always in this order:
+		</p>
+		<figure>
+			<pre><code>
+sig                    (3 bytes)
+prev                   (4 bytes)
+type                   (4 bytes)
+services               (8 bytes)
+alsoKnownAs            (11 bytes)
+rotationKeys           (12 bytes)
+verificationMethods    (19 bytes)
+			</code></pre>
+		</figure>
+		<p>
+			(You might notice that the <abbr title="JavaScript Object Notation">JSON</abbr> that <strong>plc.directory</strong> returns has its keys in this same order.)
+		</p>
+		<p>
+			Every <abbr title="Concise Binary Object Representation">CBOR</abbr> item starts with a <strong>head</strong>.
+			The top 3 bits of the first byte are the <em>major type</em>.
+			The bottom 5 bits are the length (if the length is less-than 24), or say how many more bytes hold the length (24 means 1 byte, 25 means 2 bytes, 26 means 4 bytes, 27 means 8 bytes).
+		</p>
+		<p>
+			A <abbr title="Public Ledger of Credentials">PLC</abbr> operation only needs 4 of the major types, plus <code>null</code>:
+		</p>
+		<figure>
+			<table>
+				<thead>
+					<tr>
+						<th>Major Type</th>
+						<th>Meaning</th>
+						<th>First Byte</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td>3</td>
+						<td>text string</td>
+						<td><code>0x60</code> + length</td>
+					</tr>
+					<tr>
+						<td>4</td>
+						<td>array</td>
+						<td><code>0x80</code> + length</td>
+					</tr>
+					<tr>
+						<td>5</td>
+						<td>map</td>
+						<td><code>0xa0</code> + length</td>
+					</tr>
+					<tr>
+						<td>7</td>
+						<td><code>null</code></td>
+						<td><code>0xf6</code></td>
+					</tr>
+				</tbody>
+			</table>
+		</figure>
+		<p>
+			For example, here is the start of the <abbr title="Directed Acyclic Graph — Concise Binary Object Representation">DAG-CBOR</abbr> encoding of the genesis operation of <code>did:plc:ewvi7nxzyoun6zhxrhs64oiz</code>:
+		</p>
+		<figure>
+			<pre><code>
+a7                          map, 7 entries
+   63 73 69 67              text, 3 bytes: "sig"
+   78 56 6c 7a 61 34 …      text, 86 bytes (0x56): "lza4at_jCtGo…"
+   64 70 72 65 76           text, 4 bytes: "prev"
+   f6                       null
+   64 74 79 70 65           text, 4 bytes: "type"
+   6d 70 6c 63 5f 6f …      text, 13 bytes: "plc_operation"
+   68 73 65 72 76 69 …      text, 8 bytes: "services"
+   a1                       map, 1 entry
+      6b 61 74 70 72 6f …   text, 11 bytes: "atproto_pds"
+      a2                    map, 2 entries
+         64 74 79 70 65     text, 4 bytes: "type"
+         78 19 41 74 70 …   text, 25 bytes (0x19): "AtprotoPersonalDataServer"
+         68 65 6e 64 70 …   text, 8 bytes: "endpoint"
+         73 68 74 74 70 …   text, 19 bytes: "https://bsky.social"
+   …
+			</code></pre>
+			<figcaption>
+				Notice that, inside of the service, <code>type</code> (4 bytes) comes before <code>endpoint</code> (8 bytes) — shorter keys first.
+			</figcaption>
+		</figure>
+		<p>
+			One more thing:
+			the <code>prev</code> field (a <abbr title="Content Identifier">CID</abbr>) is encoded as a regular text string.
+			(<abbr title="Directed Acyclic Graph — Concise Binary Object Representation">DAG-CBOR</abbr> has a special way to encode <abbr title="Content Identifier">CID</abbr>s, using tag 42.
+			<abbr title="Public Ledger of Credentials">PLC</abbr> does <strong>not</strong> use it.)
+		</p>
+	</section>
+	<section>
+		<h1>Signing</h1>
+		<p>
+			To sign an operation:
+		</p>
+		<ol>
+			<li>encode the operation as <abbr title="Directed Acyclic Graph — Concise Binary Object Representation">DAG-CBOR</abbr> <em>without</em> the <code>sig</code> field (not with <code>sig</code> set to <code>null</code> — leave it out completely),</li>
+			<li>hash those bytes with <abbr title="Secure Hash Algorithm 256">SHA-256</abbr>,</li>
+			<li>sign the hash with <abbr title="Elliptic Curve Digital Signature Algorithm">ECDSA</abbr>, using the private-key of one of the rotation-keys, which gives you 2 numbers: <code>r</code> and <code>s</code>,</li>
+			<li>make it “low-S” — if <code>s</code> is greater than half of the curve's order <code>n</code>, replace <code>s</code> with <code>n - s</code>,</li>
+			<li>write <code>r</code> as 32 big-endian bytes, followed by <code>s</code> as 32 big-endian bytes (64 bytes total),</li>
+			<li>encode those 64 bytes as base64url, with <strong>no</strong> <code>=</code> padding.</li>
+		</ol>
+		<p>
+			The result goes in the <code>sig</code> field.
+		</p>
+		<p>
+			Why “low-S”‽
+			Because for any valid <abbr title="Elliptic Curve Digital Signature Algorithm">ECDSA</abbr> signature <code>(r, s)</code>, the signature <code>(r, n - s)</code> is <em>also</em> valid.
+			If both were allowed, someone could change the signature (and thus change the hash of the operation) without knowing the private-key.
+			So, only the “low” one is allowed.
+			The directory rejects “high-S” signatures.
+		</p>
+	</section>
+	<section>
+		<h1>Generating the Code in Go</h1>
+		<p>
+			Now let's write a program that generates the code of a <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong>.
+		</p>
+		<p>
+			Go's standard library has <abbr title="Secure Hash Algorithm 256">SHA-256</abbr>, base32, base64url, and P-256 <abbr title="Elliptic Curve Digital Signature Algorithm">ECDSA</abbr>.
+			It does <strong>not</strong> have <abbr title="Directed Acyclic Graph — Concise Binary Object Representation">DAG-CBOR</abbr>, base58btc, or k256.
+			So, we will write our own (small) <abbr title="Directed Acyclic Graph — Concise Binary Object Representation">DAG-CBOR</abbr> encoder and base58btc encoder.
+			And, we will use P-256 keys.
+		</p>
+		<p>
+			We will use 3 files.
+			First, the <abbr title="Directed Acyclic Graph — Concise Binary Object Representation">DAG-CBOR</abbr> encoder.
+			It only supports what a <abbr title="Public Ledger of Credentials">PLC</abbr> operation needs:
+		</p>
+		<figure>
+			<pre>
+<code>package main
+
+import (
+	"encoding/binary"
+	"fmt"
+	"sort"
+)
+
+// dagcbor encodes a value as DAG-CBOR.
+//
+// It only supports what a DID-PLC operation needs:
+// nil, string, []string, []any, map[string]string, and map[string]any.
+func dagcbor(value any) ([]byte, error) {
+	switch v := value.(type) {
+	case nil:
+		return []byte{0xf6}, nil // null
+	case string:
+		return append(cborHead(3, uint64(len(v))), v...), nil
+	case []string:
+		var list []any
+		for _, s := range v {
+			list = append(list, s)
+		}
+		return dagcbor(list)
+	case []any:
+		result := cborHead(4, uint64(len(v)))
+		for _, item := range v {
+			p, err := dagcbor(item)
+			if nil != err {
+				return nil, err
+			}
+			result = append(result, p...)
+		}
+		return result, nil
+	case map[string]string:
+		var m = map[string]any{}
+		for key, s := range v {
+			m[key] = s
+		}
+		return dagcbor(m)
+	case map[string]any:
+		var keys []string
+		for key := range v {
+			keys = append(keys, key)
+		}
+		// DAG-CBOR sorts map keys: shorter keys first, then byte-wise.
+		sort.Slice(keys, func(i, j int) bool {
+			if len(keys[i]) != len(keys[j]) {
+				return len(keys[i]) &lt; len(keys[j])
+			}
+			return keys[i] &lt; keys[j]
+		})
+		result := cborHead(5, uint64(len(v)))
+		for _, key := range keys {
+			k, err := dagcbor(key)
+			if nil != err {
+				return nil, err
+			}
+			p, err := dagcbor(v[key])
+			if nil != err {
+				return nil, err
+			}
+			result = append(result, k...)
+			result = append(result, p...)
+		}
+		return result, nil
+	default:
+		return nil, fmt.Errorf("dagcbor: unsupported type %T", value)
+	}
+}
+
+// cborHead returns the first byte(s) of a CBOR item —
+// the major-type (top 3 bits) and the length (using as few bytes as possible).
+func cborHead(major byte, n uint64) []byte {
+	major &lt;&lt;= 5
+	switch {
+	case n &lt; 24:
+		return []byte{major | byte(n)}
+	case n &lt;= 0xff:
+		return []byte{major | 24, byte(n)}
+	case n &lt;= 0xffff:
+		return binary.BigEndian.AppendUint16([]byte{major | 25}, uint16(n))
+	case n &lt;= 0xffffffff:
+		return binary.BigEndian.AppendUint32([]byte{major | 26}, uint32(n))
+	default:
+		return binary.BigEndian.AppendUint64([]byte{major | 27}, n)
+	}
+}</code>
+			</pre>
+			<figcaption>
+				<code>dagcbor.go</code> — a small <abbr title="Directed Acyclic Graph — Concise Binary Object Representation">DAG-CBOR</abbr> encoder.
+			</figcaption>
+		</figure>
+		<p>
+			Second, the <code>did:key</code> encoder.
+			Go's <code>(*ecdsa.PublicKey).Bytes()</code> gives us the <em>uncompressed</em> point — <code>0x04</code>, followed by the 32 bytes of X, followed by the 32 bytes of Y.
+			To compress it, we keep X, and replace <code>0x04</code> with <code>0x02</code> (if Y is even) or <code>0x03</code> (if Y is odd):
+		</p>
+		<figure>
+			<pre>
+<code>package main
+
+import (
+	"crypto/ecdsa"
+	"math/big"
+)
+
+// didKey returns the "did:key:…" form of a P-256 public-key.
+func didKey(publicKey *ecdsa.PublicKey) (string, error) {
+	// 0x04 ‖ X (32 bytes) ‖ Y (32 bytes)
+	uncompressed, err := publicKey.Bytes()
+	if nil != err {
+		return "", err
+	}
+
+	// compressed = (0x02 if Y is even, 0x03 if Y is odd) ‖ X
+	var compressed []byte
+	compressed = append(compressed, 0x02|(uncompressed[64]&amp;1))
+	compressed = append(compressed, uncompressed[1:33]...)
+
+	// 0x80 0x24 is the multicodec "p256-pub" (0x1200) as a varint.
+	var data []byte
+	data = append(data, 0x80, 0x24)
+	data = append(data, compressed...)
+
+	// "z" is the multibase prefix for base58btc.
+	return "did:key:z" + base58btc(data), nil
+}
+
+const base58alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+// base58btc encodes data using the Bitcoin base58 alphabet.
+func base58btc(data []byte) string {
+	var number = new(big.Int).SetBytes(data)
+	var radix = big.NewInt(58)
+	var remainder = new(big.Int)
+
+	var result []byte
+	for 0 &lt; number.Sign() {
+		number.DivMod(number, radix, remainder)
+		result = append(result, base58alphabet[remainder.Int64()])
+	}
+	// each leading zero byte becomes a leading "1"
+	for _, b := range data {
+		if 0 != b {
+			break
+		}
+		result = append(result, '1')
+	}
+	// the digits were produced least-significant first, so reverse them
+	for i, j := 0, len(result)-1; i &lt; j; i, j = i+1, j-1 {
+		result[i], result[j] = result[j], result[i]
+	}
+	return string(result)
+}</code>
+			</pre>
+			<figcaption>
+				<code>didkey.go</code> — turns a P-256 public-key into a <code>did:key</code>.
+			</figcaption>
+		</figure>
+		<p>
+			Third, signing, the <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong> itself, and the <abbr title="Content Identifier">CID</abbr> (which we will need later, for updates):
+		</p>
+		<figure>
+			<pre>
+<code>package main
+
+import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base32"
+	"encoding/base64"
+	"math/big"
+)
+
+// base32 (RFC-4648), lower-case, without "=" padding.
+var b32 = base32.NewEncoding("abcdefghijklmnopqrstuvwxyz234567").WithPadding(base32.NoPadding)
+
+// sign signs an (unsigned) operation, and returns the value for its "sig" field.
+func sign(privateKey *ecdsa.PrivateKey, unsigned map[string]any) (string, error) {
+	data, err := dagcbor(unsigned)
+	if nil != err {
+		return "", err
+	}
+
+	hash := sha256.Sum256(data)
+
+	r, s, err := ecdsa.Sign(rand.Reader, privateKey, hash[:])
+	if nil != err {
+		return "", err
+	}
+
+	// "low-S": if s is in the upper-half of the curve-order, use (n - s) instead.
+	n := elliptic.P256().Params().N
+	halfN := new(big.Int).Rsh(n, 1)
+	if s.Cmp(halfN) &gt; 0 {
+		s = new(big.Int).Sub(n, s)
+	}
+
+	// 32 bytes of r, followed by 32 bytes of s (big-endian).
+	var signature [64]byte
+	r.FillBytes(signature[:32])
+	s.FillBytes(signature[32:])
+
+	return base64.RawURLEncoding.EncodeToString(signature[:]), nil
+}
+
+// didPLC returns the DID-PLC for a signed genesis operation.
+func didPLC(signedGenesis map[string]any) (string, error) {
+	data, err := dagcbor(signedGenesis)
+	if nil != err {
+		return "", err
+	}
+
+	hash := sha256.Sum256(data)
+
+	code := b32.EncodeToString(hash[:])[:24]
+
+	return "did:plc:" + code, nil
+}
+
+// cid returns the CID of a signed operation (for use in the "prev" field of the next operation).
+func cid(signed map[string]any) (string, error) {
+	data, err := dagcbor(signed)
+	if nil != err {
+		return "", err
+	}
+
+	hash := sha256.Sum256(data)
+
+	var bytes []byte
+	bytes = append(bytes, 0x01)       // CID version 1
+	bytes = append(bytes, 0x71)       // dag-cbor
+	bytes = append(bytes, 0x12, 0x20) // sha2-256, 32 bytes long
+	bytes = append(bytes, hash[:]...)
+
+	// "b" is the multibase prefix for lower-case base32.
+	return "b" + b32.EncodeToString(bytes), nil
+}</code>
+			</pre>
+			<figcaption>
+				<code>plc.go</code> — signing, the <abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr>, and the <abbr title="Content Identifier">CID</abbr>.
+			</figcaption>
+		</figure>
+		<p>
+			The function that makes the code is <code>didPLC</code>.
+			And, it is short:
+			<abbr title="Directed Acyclic Graph — Concise Binary Object Representation">DAG-CBOR</abbr>, <abbr title="Secure Hash Algorithm 256">SHA-256</abbr>, base32, keep the first 24 characters.
+		</p>
+	</section>
+	<section>
+		<h1>Checking Our Work</h1>
+		<p>
+			How do we know that our code is correct?
+			We can take a <em>real</em> <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong>, get its genesis operation from <strong>plc.directory</strong>, and calculate the <abbr title="Decentralized Identifier">DID</abbr> ourselves.
+			If we get the same <abbr title="Decentralized Identifier">DID</abbr>, then our <abbr title="Directed Acyclic Graph — Concise Binary Object Representation">DAG-CBOR</abbr> encoder, <abbr title="Secure Hash Algorithm 256">SHA-256</abbr>, and base32 are all correct.
+		</p>
+		<p>
+			Put this <code>main.go</code> in the same directory as <code>dagcbor.go</code>, <code>didkey.go</code>, and <code>plc.go</code>:
+		</p>
+		<figure>
+			<pre>
+<code>package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"os"
+)
+
+const directory = "https://plc.directory"
+
+func main() {
+	did := os.Args[1]
+
+	response, err := http.Get(directory + "/" + did + "/log")
+	if nil != err {
+		panic(err)
+	}
+	defer response.Body.Close()
+
+	var operations []map[string]any
+	err = json.NewDecoder(response.Body).Decode(&amp;operations)
+	if nil != err {
+		panic(err)
+	}
+
+	genesis := operations[0]
+
+	calculated, err := didPLC(genesis)
+	if nil != err {
+		panic(err)
+	}
+
+	fmt.Println("DID:       ", did)
+	fmt.Println("calculated:", calculated)
+	fmt.Println("match:     ", did == calculated)
+}</code>
+			</pre>
+			<figcaption>
+				<code>main.go</code> — calculates the <abbr title="Decentralized Identifier">DID</abbr> from its genesis operation, and checks it.
+			</figcaption>
+		</figure>
+		<p>
+			Running it:
+		</p>
+		<figure>
+			<pre><code>
+$ go run . did:plc:ewvi7nxzyoun6zhxrhs64oiz
+DID:        did:plc:ewvi7nxzyoun6zhxrhs64oiz
+calculated: did:plc:ewvi7nxzyoun6zhxrhs64oiz
+match:      true
+
+$ go run . did:plc:z72i7hdynmk6r22z27h6tvur
+DID:        did:plc:z72i7hdynmk6r22z27h6tvur
+calculated: did:plc:z72i7hdynmk6r22z27h6tvur
+match:      true
+			</code></pre>
+		</figure>
+		<p>
+			(<code>did:plc:z72i7hdynmk6r22z27h6tvur</code> is <code>@bsky.app</code>.)
+		</p>
+		<p>
+			Note that we decode the <abbr title="JavaScript Object Notation">JSON</abbr> into a <code>map[string]any</code>
+			—
+			not into a Go <code>struct</code>.
+			That way, whatever fields the operation has are the fields that get hashed.
+			(This matters for the legacy <code>create</code> operations, which have different fields.)
+		</p>
+	</section>
+	<section>
+		<h1>plc.directory</h1>
+		<p>
+			<strong>plc.directory</strong> (<code>https://plc.directory</code>) is the directory server for <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong>.
+			It stores the log of operations for every <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong>, checks every new operation, and answers questions about them.
+		</p>
+		<p>
+			It is a plain <abbr title="HyperText Transfer Protocol">HTTP</abbr> + <abbr title="JavaScript Object Notation">JSON</abbr> <abbr title="application programming interface">API</abbr>.
+			Reading does not need any authentication.
+			(Neither does writing — operations are authenticated by their signatures.)
+		</p>
+		<figure>
+			<table>
+				<thead>
+					<tr>
+						<th>Method</th>
+						<th>Path</th>
+						<th>Returns</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td><code>GET</code></td>
+						<td><code>/:did</code></td>
+						<td>the <abbr title="Decentralized Identifier">DID</abbr> document (<code>application/did+ld+json</code>)</td>
+					</tr>
+					<tr>
+						<td><code>GET</code></td>
+						<td><code>/:did/data</code></td>
+						<td>the current <abbr title="Public Ledger of Credentials">PLC</abbr> data (<code>rotationKeys</code>, <code>verificationMethods</code>, <code>alsoKnownAs</code>, <code>services</code>)</td>
+					</tr>
+					<tr>
+						<td><code>GET</code></td>
+						<td><code>/:did/log</code></td>
+						<td>the (currently valid) operations, as a <abbr title="JavaScript Object Notation">JSON</abbr> array</td>
+					</tr>
+					<tr>
+						<td><code>GET</code></td>
+						<td><code>/:did/log/audit</code></td>
+						<td>every operation, including nullified ones, with its <code>cid</code>, <code>createdAt</code>, and <code>nullified</code></td>
+					</tr>
+					<tr>
+						<td><code>GET</code></td>
+						<td><code>/:did/log/last</code></td>
+						<td>the most recent operation</td>
+					</tr>
+					<tr>
+						<td><code>POST</code></td>
+						<td><code>/:did</code></td>
+						<td>submits a new (signed) operation</td>
+					</tr>
+					<tr>
+						<td><code>GET</code></td>
+						<td><code>/export</code></td>
+						<td>every operation for every <abbr title="Decentralized Identifier">DID</abbr>, as <abbr title="JavaScript Object Notation">JSON</abbr> Lines</td>
+					</tr>
+				</tbody>
+			</table>
+			<figcaption>
+				The <strong>plc.directory</strong> <abbr title="application programming interface">API</abbr>.
+				(<code>:did</code> is the whole <abbr title="Decentralized Identifier">DID</abbr>, such as <code>did:plc:ewvi7nxzyoun6zhxrhs64oiz</code>.)
+			</figcaption>
+		</figure>
+		<p>
+			You can try these with <code>curl</code>:
+		</p>
+		<figure>
+			<pre><code>
+$ curl https://plc.directory/did:plc:ewvi7nxzyoun6zhxrhs64oiz/data
+{"did":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","verificationMethods":{"atproto":"did:key:zQ3shunBKsXixLxKtC5qeSG9E4J5RkGN57im31pcTzbNQnm5w"},"rotationKeys":["did:key:zQ3shhCGUqDKjStzuDxPkTxN6ujddP4RkEKJJouJGRRkaLGbg","did:key:zQ3shpKnbdPx3g3CmPf5cRVTPe1HtSwVn5ish3wSnDPQCbLJK"],"alsoKnownAs":["at://atproto.com"],"services":{"atproto_pds":{"type":"AtprotoPersonalDataServer","endpoint":"https://enoki.us-east.host.bsky.network"}}}
+			</code></pre>
+		</figure>
+		<p>
+			If the <abbr title="Decentralized Identifier">DID</abbr> does not exist, you get a <code>404</code>:
+		</p>
+		<figure>
+			<pre><code>
+{"message":"DID not registered: did:plc:aaaaaaaaaaaaaaaaaaaaaaaa"}
+			</code></pre>
+		</figure>
+		<section>
+			<h1>Getting Information in Go</h1>
+			<p>
+				Here is a Go program that gets the current data for a <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong> from <strong>plc.directory</strong>.
+				It does not need any of the other files:
+			</p>
+			<figure>
+				<pre>
+<code>package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"os"
+)
+
+const directory = "https://plc.directory"
+
+type Service struct {
+	Type     string `json:"type"`
+	Endpoint string `json:"endpoint"`
+}
+
+type Data struct {
+	DID                 string             `json:"did"`
+	RotationKeys        []string           `json:"rotationKeys"`
+	VerificationMethods map[string]string  `json:"verificationMethods"`
+	AlsoKnownAs         []string           `json:"alsoKnownAs"`
+	Services            map[string]Service `json:"services"`
+}
+
+func main() {
+	did := os.Args[1]
+
+	response, err := http.Get(directory + "/" + did + "/data")
+	if nil != err {
+		panic(err)
+	}
+	defer response.Body.Close()
+
+	if http.StatusOK != response.StatusCode {
+		fmt.Println("HTTP status:", response.Status)
+		os.Exit(1)
+	}
+
+	var data Data
+	err = json.NewDecoder(response.Body).Decode(&amp;data)
+	if nil != err {
+		panic(err)
+	}
+
+	fmt.Println("DID:        ", data.DID)
+	fmt.Println("handle:     ", data.AlsoKnownAs)
+	fmt.Println("PDS:        ", data.Services["atproto_pds"].Endpoint)
+	fmt.Println("signing-key:", data.VerificationMethods["atproto"])
+	fmt.Println("rotation-keys:")
+	for _, key := range data.RotationKeys {
+		fmt.Println("\t", key)
+	}
+}</code>
+				</pre>
+				<figcaption>
+					<code>main.go</code> — gets the data for a <abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr> from <strong>plc.directory</strong>.
+				</figcaption>
+			</figure>
+			<p>
+				Running it:
+			</p>
+			<figure>
+				<pre><code>
+$ go run . did:plc:ewvi7nxzyoun6zhxrhs64oiz
+DID:         did:plc:ewvi7nxzyoun6zhxrhs64oiz
+handle:      [at://atproto.com]
+PDS:         https://enoki.us-east.host.bsky.network
+signing-key: did:key:zQ3shunBKsXixLxKtC5qeSG9E4J5RkGN57im31pcTzbNQnm5w
+rotation-keys:
+	 did:key:zQ3shhCGUqDKjStzuDxPkTxN6ujddP4RkEKJJouJGRRkaLGbg
+	 did:key:zQ3shpKnbdPx3g3CmPf5cRVTPe1HtSwVn5ish3wSnDPQCbLJK
+				</code></pre>
+			</figure>
+			<p>
+				If you are building an <strong><abbr title="Authenticated Transfer Protocol">ATProto</abbr></strong> app, this is how you find out where an account's data is (its <abbr title="Personal Data Server">PDS</abbr>), and what key its data is signed with.
+			</p>
+		</section>
+		<section>
+			<h1>Operation Log</h1>
+			<p>
+				The audit log (<code>/:did/log/audit</code>) shows the history of a <abbr title="Decentralized Identifier">DID</abbr>.
+				For example, the history of <code>did:plc:ewvi7nxzyoun6zhxrhs64oiz</code> is:
+			</p>
+			<figure>
+				<table>
+					<thead>
+						<tr>
+							<th><code>createdAt</code></th>
+							<th>Handle</th>
+							<th><abbr title="Personal Data Server">PDS</abbr></th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>2023-04-26T06:19:25.508Z</td>
+							<td><code>at://atprotocol.bsky.social</code></td>
+							<td><code>https://bsky.social</code></td>
+						</tr>
+						<tr>
+							<td>2023-04-26T17:16:46.827Z</td>
+							<td><code>at://atproto.com</code></td>
+							<td><code>https://bsky.social</code></td>
+						</tr>
+						<tr>
+							<td>2023-11-10T02:50:49.142Z</td>
+							<td><code>at://atproto.com</code></td>
+							<td><code>https://enoki.us-east.host.bsky.network</code></td>
+						</tr>
+					</tbody>
+				</table>
+			</figure>
+			<p>
+				The handle changed.
+				The <abbr title="Personal Data Server">PDS</abbr> changed.
+				The signing-key changed (with the move to the new <abbr title="Personal Data Server">PDS</abbr>).
+				The <abbr title="Decentralized Identifier">DID</abbr> did <strong>not</strong> change.
+			</p>
+			<p>
+				Each entry in the audit log looks like this:
+			</p>
+			<figure>
+				<pre><code>
+{
+  "did": "did:plc:ewvi7nxzyoun6zhxrhs64oiz",
+  "operation": { … },
+  "cid": "bafyreibfvkh3n6odvdpwj54j4xxdsgnn4zo5utbyf7z7nfbyikhtygzjcq",
+  "nullified": false,
+  "createdAt": "2023-04-26T06:19:25.508Z"
+}
+				</code></pre>
+			</figure>
+			<p>
+				The <code>createdAt</code> is when the directory accepted the operation.
+				It is <em>not</em> part of the signed operation.
+			</p>
+		</section>
+		<section>
+			<h1>Export</h1>
+			<p>
+				The set of all <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr>s</strong>, and all of their operations, is public.
+				You can download <em>all</em> of it with <code>/export</code>.
+			</p>
+			<p>
+				<code>/export</code> returns <abbr title="JavaScript Object Notation">JSON</abbr> Lines (one <abbr title="JavaScript Object Notation">JSON</abbr> object per line).
+				It takes 2 query parameters:
+			</p>
+			<dl>
+				<dt><code>count</code></dt>
+				<dd>
+					<p>
+						how many operations to return (at most 1000).
+					</p>
+				</dd>
+
+				<dt><code>after</code></dt>
+				<dd>
+					<p>
+						a cursor — the <code>seq</code> number of the last operation you got.
+						Use <code>after=0</code> to start from the beginning.
+					</p>
+				</dd>
+			</dl>
+			<figure>
+				<pre><code>
+$ curl 'https://plc.directory/export?count=1&amp;after=0'
+{"did":"did:plc:ragtjsm2j2vknwkz3zp4oxrd","cid":"bafyreieibu2mtgsovktnswo6l7dv4i4ztioutzpsy7wsasmbznzqxkpyje","seq":1,"createdAt":"2022-11-17T00:35:16.391Z","operation":{"sig":"DyaPWDItkJnVkN1izINSW-fdjUzP9BkIKlD7SnzD5axfK_870ZZ-1EYcrQLQtP9VkWcp2cdbyIHprjPfeUs8WQ","prev":null,"type":"create","handle":"paul.bsky.social","service":"https://bsky.social","signingKey":"did:key:zQ3shP5TBe1sQfSttXty15FAEHV1DZgcxRZNxvEWnPfLFwLxJ","recoveryKey":"did:key:zQ3shhCGUqDKjStzuDxPkTxN6ujddP4RkEKJJouJGRRkaLGbg"},"type":"sequenced_op"}
+				</code></pre>
+				<figcaption>
+					The very first operation in <strong>plc.directory</strong> — from 17 November 2022.
+				</figcaption>
+			</figure>
+			<p>
+				To get the next page, use the <code>seq</code> of the last line as the next <code>after</code>.
+			</p>
+			<p>
+				(If you leave out <code>after</code>, or use a timestamp for <code>after</code>, you get an older format, without <code>seq</code>, which is sorted by <code>createdAt</code>.
+				Its use is discouraged.)
+			</p>
+			<p>
+				There is also a WebSocket at <code>wss://plc.directory/export/stream</code> that streams new operations as they are accepted.
+				It takes an optional <code>cursor</code> (a <code>seq</code> number) to catch up from.
+			</p>
+		</section>
+	</section>
+	<section>
+		<h1>Adding a New <abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></h1>
+		<p>
+			To add a new <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong> to <strong>plc.directory</strong>:
+		</p>
+		<ol>
+			<li>create the keys — at least 1 rotation-key, and (for <abbr title="Authenticated Transfer Protocol">ATProto</abbr>) a signing-key,</li>
+			<li>create the (unsigned) genesis operation, with <code>"prev": null</code>,</li>
+			<li>sign it with (the private-key of) one of its rotation-keys, and add the <code>sig</code>,</li>
+			<li>calculate the <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong> from the signed genesis operation,</li>
+			<li><code>POST</code> the signed genesis operation, as <abbr title="JavaScript Object Notation">JSON</abbr>, to <code>https://plc.directory/</code> followed by the <abbr title="Decentralized Identifier">DID</abbr>.</li>
+		</ol>
+		<p>
+			That's it.
+			There is no account to sign up for, and no <abbr title="application programming interface">API</abbr> key.
+			The directory checks that the signature is valid, and that the <abbr title="Decentralized Identifier">DID</abbr> in the <abbr title="Uniform Resource Locator">URL</abbr> matches the hash of the operation.
+			If both are correct, the <abbr title="Decentralized Identifier">DID</abbr> is registered.
+		</p>
+		<p>
+			Here is a Go program that does it.
+			Put it in the same directory as <code>dagcbor.go</code>, <code>didkey.go</code>, and <code>plc.go</code>:
+		</p>
+		<figure>
+			<pre>
+<code>package main
+
+import (
+	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+)
+
+const directory = "https://plc.directory"
+
+func main() {
+	// 1. Create the rotation-key and the signing-key.
+	rotationKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if nil != err {
+		panic(err)
+	}
+	signingKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if nil != err {
+		panic(err)
+	}
+
+	rotationDidKey, err := didKey(&amp;rotationKey.PublicKey)
+	if nil != err {
+		panic(err)
+	}
+	signingDidKey, err := didKey(&amp;signingKey.PublicKey)
+	if nil != err {
+		panic(err)
+	}
+
+	// 2. Create the (unsigned) genesis operation.
+	operation := map[string]any{
+		"type":         "plc_operation",
+		"rotationKeys": []string{rotationDidKey},
+		"verificationMethods": map[string]string{
+			"atproto": signingDidKey,
+		},
+		"alsoKnownAs": []string{"at://alice.example.com"},
+		"services": map[string]any{
+			"atproto_pds": map[string]string{
+				"type":     "AtprotoPersonalDataServer",
+				"endpoint": "https://pds.example.com",
+			},
+		},
+		"prev": nil,
+	}
+
+	// 3. Sign it with the rotation-key.
+	sig, err := sign(rotationKey, operation)
+	if nil != err {
+		panic(err)
+	}
+	operation["sig"] = sig
+
+	// 4. Calculate the DID-PLC from the signed genesis operation.
+	did, err := didPLC(operation)
+	if nil != err {
+		panic(err)
+	}
+	fmt.Println("DID:", did)
+
+	// 5. Submit the signed genesis operation to the PLC directory.
+	body, err := json.Marshal(operation)
+	if nil != err {
+		panic(err)
+	}
+	response, err := http.Post(directory+"/"+did, "application/json", bytes.NewReader(body))
+	if nil != err {
+		panic(err)
+	}
+	defer response.Body.Close()
+
+	responseBody, _ := io.ReadAll(response.Body)
+	fmt.Println("HTTP status:", response.Status)
+	fmt.Println("HTTP response body:", string(responseBody))
+	if http.StatusOK != response.StatusCode {
+		os.Exit(1)
+	}
+
+	// 6. Keep the private keys!
+	//    (Without the rotation-key you cannot ever update this DID.)
+	rotationKeyBytes, _ := rotationKey.Bytes()
+	signingKeyBytes, _ := signingKey.Bytes()
+	fmt.Println("rotation private-key:", hex.EncodeToString(rotationKeyBytes))
+	fmt.Println("signing private-key: ", hex.EncodeToString(signingKeyBytes))
+}</code>
+			</pre>
+			<figcaption>
+				<code>main.go</code> — creates a new <abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr>, and adds it to <strong>plc.directory</strong>.
+			</figcaption>
+		</figure>
+		<p>
+			Running it (against a local development directory) gave:
+		</p>
+		<figure>
+			<pre><code>
+$ go run .
+DID: did:plc:tw6n5eczp2hq4qhj7qg4ypzz
+HTTP status: 200 OK
+HTTP response body: OK
+rotation private-key: bc380980f1bf86d3624a7c5c1eda02371713b334ebdb05d1919b3ca83f97bc89
+signing private-key:  aa75bb9f610e54744632f8b183f64038c0bd2752ebbcdb71de3ba3bc552fc0a5
+			</code></pre>
+		</figure>
+		<p>
+			(You will get a different <abbr title="Decentralized Identifier">DID</abbr> and different keys every time you run it.)
+		</p>
+		<p>
+			A few warnings:
+		</p>
+		<ul>
+			<li>
+				<strong>Operations are permanent.</strong>
+				Once a <abbr title="Decentralized Identifier">DID</abbr> is added to <strong>plc.directory</strong>, it (and its whole history) is public forever.
+				It can be deactivated (with a tombstone), but it cannot be removed.
+				So, do <strong>not</strong> experiment against <code>https://plc.directory</code>.
+			</li>
+			<li>
+				<strong>Keep the rotation-key.</strong>
+				If you lose the private-key of every rotation-key, you can never change the <abbr title="Decentralized Identifier">DID</abbr> again.
+				And, if someone else gets it, they can take control of the <abbr title="Decentralized Identifier">DID</abbr>.
+				(Printing it, like this example does, is only for learning. Store it somewhere safe.)
+			</li>
+			<li>
+				<strong>The handle and the <abbr title="Personal Data Server">PDS</abbr> must be real</strong> for the <abbr title="Decentralized Identifier">DID</abbr> to be a working <abbr title="Authenticated Transfer Protocol">ATProto</abbr> account.
+				Normally, a <abbr title="Personal Data Server">PDS</abbr> creates the <abbr title="Decentralized Identifier">DID</abbr> for you when you create an account on it.
+				You would do this yourself if you are writing a <abbr title="Personal Data Server">PDS</abbr>, or managing your own identity.
+			</li>
+		</ul>
+		<section>
+			<h1>Local Development Directory</h1>
+			<p>
+				For experimenting, run your own copy of the directory.
+				The reference directory server (<code>@did-plc/server</code>) is in the <code>did-method-plc</code> repository.
+				And, Bluesky's <abbr title="Authenticated Transfer Protocol">ATProto</abbr> development environment (<code>dev-env</code>) runs one at <code>http://localhost:2582</code> (with a <abbr title="Personal Data Server">PDS</abbr> at <code>http://localhost:2583</code>).
+			</p>
+			<p>
+				Then, change one line:
+			</p>
+			<figure>
+				<pre><code>
+const directory = "http://localhost:2582"
+				</code></pre>
+			</figure>
+		</section>
+		<section>
+			<h1>Errors</h1>
+			<p>
+				If something is wrong, the directory returns a <code>400</code> with a <abbr title="JavaScript Object Notation">JSON</abbr> <code>message</code>.
+				For example (all of these came from trying them against a local directory):
+			</p>
+			<figure>
+				<table>
+					<thead>
+						<tr>
+							<th>Mistake</th>
+							<th><code>message</code></th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>the <abbr title="Decentralized Identifier">DID</abbr> in the <abbr title="Uniform Resource Locator">URL</abbr> is wrong</td>
+							<td><code>Hash of genesis operation does not match DID identifier: did:plc:…</code></td>
+						</tr>
+						<tr>
+							<td>the operation was changed after it was signed</td>
+							<td><code>Invalid signature on op: …</code></td>
+						</tr>
+						<tr>
+							<td>signed with a key that is not a rotation-key (such as the signing-key)</td>
+							<td><code>Invalid signature on op: …</code></td>
+						</tr>
+						<tr>
+							<td>the <code>sig</code> has <code>=</code> padding</td>
+							<td><code>Invalid signature on op: …</code></td>
+						</tr>
+						<tr>
+							<td><code>prev</code> was left out (instead of being <code>null</code>)</td>
+							<td><code>Not a valid operation: …</code></td>
+						</tr>
+						<tr>
+							<td>the same genesis operation was submitted twice</td>
+							<td><code>Operations not correctly ordered</code></td>
+						</tr>
+					</tbody>
+				</table>
+			</figure>
+			<p>
+				Notice that the first one tells you what the <abbr title="Decentralized Identifier">DID</abbr> <em>should</em> have been.
+				That is handy when debugging your <abbr title="Directed Acyclic Graph — Concise Binary Object Representation">DAG-CBOR</abbr> encoder.
+			</p>
+			<p>
+				The reference directory also has limits.
+				For example:
+				an operation can be at most 4000 bytes (as <abbr title="Directed Acyclic Graph — Concise Binary Object Representation">DAG-CBOR</abbr>),
+				at most 10 rotation-keys, 10 <code>alsoKnownAs</code> entries, 10 services, and 10 verification-methods,
+				and a <abbr title="Decentralized Identifier">DID</abbr> can have at most 10 operations per hour, 30 per day, and 100 per week.
+			</p>
+		</section>
+	</section>
+	<section>
+		<h1>Updating</h1>
+		<p>
+			To change a <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong> (for example, to change its handle, or move it to a different <abbr title="Personal Data Server">PDS</abbr>), you add a new operation to its log.
+		</p>
+		<p>
+			An update operation is just like a genesis operation, except:
+		</p>
+		<ul>
+			<li>it must contain <em>all</em> of the fields (not just the ones that changed),</li>
+			<li><code>prev</code> is the <strong><abbr title="Content Identifier">CID</abbr></strong> of the previous operation (instead of <code>null</code>),</li>
+			<li>it must be signed by one of the rotation-keys of the <em>previous</em> operation,</li>
+			<li>it is <code>POST</code>ed to the <abbr title="Uniform Resource Locator">URL</abbr> of the existing <abbr title="Decentralized Identifier">DID</abbr>.</li>
+		</ul>
+		<section>
+			<h1><abbr title="Content Identifier">CID</abbr></h1>
+			<p>
+				A <strong><abbr title="Content Identifier">CID</abbr></strong> (short for <em>Content Identifier</em>) is a self-describing hash.
+				The <abbr title="Content Identifier">CID</abbr> of an operation is made from the same <abbr title="Secure Hash Algorithm 256">SHA-256</abbr> hash as the <abbr title="Decentralized Identifier">DID</abbr> is
+				—
+				but <em>all</em> of it, with a few bytes in front that say what it is:
+			</p>
+			<figure>
+				<pre><code>
+0x01           CID version 1
+0x71           the content is DAG-CBOR
+0x12           the hash is SHA-256
+0x20           the hash is 32 bytes long
+…32 bytes…     the SHA-256 hash of the DAG-CBOR of the (signed) operation
+				</code></pre>
+			</figure>
+			<p>
+				Those 36 bytes are base32 encoded (lower-case, no padding), with a <code>b</code> in front (<code>b</code> means base32).
+				Because they always start with the same bytes, these <abbr title="Content Identifier">CID</abbr>s always start with <code>bafyrei</code>.
+				For example:
+			</p>
+			<figure>
+				<pre><code>
+bafyreibfvkh3n6odvdpwj54j4xxdsgnn4zo5utbyf7z7nfbyikhtygzjcq
+				</code></pre>
+				<figcaption>
+					The <abbr title="Content Identifier">CID</abbr> of the genesis operation of <code>did:plc:ewvi7nxzyoun6zhxrhs64oiz</code>.
+				</figcaption>
+			</figure>
+			<p>
+				The <code>cid</code> function in <code>plc.go</code> (above) does this.
+			</p>
+		</section>
+		<section>
+			<h1>Updating in Go</h1>
+			<p>
+				Here is a Go program that changes the handle of a <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong>.
+				It gets the most recent operation, copies it, changes the handle, points <code>prev</code> at it, signs, and submits.
+				Put it in the same directory as <code>dagcbor.go</code>, <code>didkey.go</code>, and <code>plc.go</code>:
+			</p>
+			<figure>
+				<pre>
+<code>package main
+
+import (
+	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+)
+
+const directory = "https://plc.directory"
+
+func main() {
+	did := os.Args[1]
+	newHandle := os.Args[2]
+
+	// 1. Load the rotation-key (that you saved when you created the DID).
+	rotationKeyBytes, err := hex.DecodeString(os.Args[3])
+	if nil != err {
+		panic(err)
+	}
+	rotationKey, err := ecdsa.ParseRawPrivateKey(elliptic.P256(), rotationKeyBytes)
+	if nil != err {
+		panic(err)
+	}
+
+	// 2. Get the most recent operation.
+	response, err := http.Get(directory + "/" + did + "/log/last")
+	if nil != err {
+		panic(err)
+	}
+	defer response.Body.Close()
+
+	var last map[string]any
+	err = json.NewDecoder(response.Body).Decode(&amp;last)
+	if nil != err {
+		panic(err)
+	}
+
+	// 3. Point back to it, using its CID.
+	prev, err := cid(last)
+	if nil != err {
+		panic(err)
+	}
+
+	// 4. Create the new (unsigned) operation.
+	//    It is a copy of the last operation, with the changes we want.
+	operation := map[string]any{}
+	for key, value := range last {
+		operation[key] = value
+	}
+	delete(operation, "sig")
+	operation["prev"] = prev
+	operation["alsoKnownAs"] = []string{"at://" + newHandle}
+
+	// 5. Sign it, and submit it.
+	sig, err := sign(rotationKey, operation)
+	if nil != err {
+		panic(err)
+	}
+	operation["sig"] = sig
+
+	body, err := json.Marshal(operation)
+	if nil != err {
+		panic(err)
+	}
+	response, err = http.Post(directory+"/"+did, "application/json", bytes.NewReader(body))
+	if nil != err {
+		panic(err)
+	}
+	defer response.Body.Close()
+
+	responseBody, _ := io.ReadAll(response.Body)
+	fmt.Println("HTTP status:", response.Status)
+	fmt.Println("HTTP response body:", string(responseBody))
+}</code>
+				</pre>
+				<figcaption>
+					<code>main.go</code> — changes the handle of a <abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr>.
+				</figcaption>
+			</figure>
+			<p>
+				Running it (against a local development directory):
+			</p>
+			<figure>
+				<pre><code>
+$ go run . did:plc:tw6n5eczp2hq4qhj7qg4ypzz alice2.example.com bc380980f1bf86d3624a7c5c1eda02371713b334ebdb05d1919b3ca83f97bc89
+HTTP status: 200 OK
+HTTP response body: OK
+				</code></pre>
+			</figure>
+			<p>
+				(This simple program assumes the most recent operation is a <code>plc_operation</code>.
+				It would not work if the most recent operation is a legacy <code>create</code> operation — that would need to be converted first.)
+			</p>
+		</section>
+	</section>
+	<section>
+		<h1>Tombstones</h1>
+		<p>
+			To permanently deactivate a <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong>, you add a <strong>tombstone</strong> operation.
+			It only has 3 fields:
+		</p>
+		<figure>
+			<pre><code>
+{
+  "type": "plc_tombstone",
+  "prev": "bafyrei…",
+  "sig": "…"
+}
+			</code></pre>
+		</figure>
+		<p>
+			It is signed (with a rotation-key) the same way as any other operation.
+			After a tombstone, the directory returns a <code>404</code> (<code>DID not available</code>) for the <abbr title="Decentralized Identifier">DID</abbr> document and data, and rejects any further operations.
+			But the log (including the tombstone) is still there, and still public.
+		</p>
+		<p>
+			(A tombstone can still be undone during the 72-hour recovery window — see below.)
+		</p>
+	</section>
+	<section>
+		<h1>72-Hour Recovery Window</h1>
+		<p>
+			Remember that rotation-keys are listed in order of <em>descending authority</em>?
+			This is why.
+		</p>
+		<p>
+			Let's say a <abbr title="Decentralized Identifier">DID</abbr> has 2 rotation-keys:
+			your own key (first, most authority), and your <abbr title="Personal Data Server">PDS</abbr>'s key (second).
+			And, let's say your <abbr title="Personal Data Server">PDS</abbr> gets hacked, and the attacker uses the <abbr title="Personal Data Server">PDS</abbr>'s key to submit an operation that removes your key.
+		</p>
+		<p>
+			For 72 hours after that operation, a key with <em>more</em> authority (a <em>lower</em> position in the <code>rotationKeys</code> of the operation before it) can “rewrite history”.
+			It does this by submitting a new operation whose <code>prev</code> points to the last good operation (from before the attack).
+			The directory then marks the attacker's operation(s) as <strong>nullified</strong>.
+		</p>
+		<figure>
+			<pre><code>
+genesis ──→ op A ──→ op B (attacker, signed by rotation-key #2)
+                 │
+                 └──→ op C (recovery, signed by rotation-key #1, prev = A)
+
+result:  genesis ──→ op A ──→ op C        (op B is "nullified")
+			</code></pre>
+		</figure>
+		<p>
+			A key with the <em>same</em> or <em>less</em> authority cannot do this.
+			(If you try, you get <code>Invalid signature on op</code>.)
+			And, after 72 hours, nobody can.
+		</p>
+		<p>
+			Nullified operations are still in the audit log (with <code>"nullified": true</code>), but not in <code>/:did/log</code>.
+		</p>
+	</section>
+	<section>
+		<h1>Legacy <code>create</code> Operations</h1>
+		<p>
+			The earliest <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr>s</strong> were created with an older operation format, whose <code>type</code> is <code>create</code>:
+		</p>
+		<figure>
+			<pre><code>
+{
+  "sig": "DyaPWDItkJnVkN1izINSW-fdjUzP9BkIKlD7SnzD5axfK_870ZZ-1EYcrQLQtP9VkWcp2cdbyIHprjPfeUs8WQ",
+  "prev": null,
+  "type": "create",
+  "handle": "paul.bsky.social",
+  "service": "https://bsky.social",
+  "signingKey": "did:key:zQ3shP5TBe1sQfSttXty15FAEHV1DZgcxRZNxvEWnPfLFwLxJ",
+  "recoveryKey": "did:key:zQ3shhCGUqDKjStzuDxPkTxN6ujddP4RkEKJJouJGRRkaLGbg"
+}
+			</code></pre>
+			<figcaption>
+				The genesis operation of <code>did:plc:ragtjsm2j2vknwkz3zp4oxrd</code> — the first operation in <strong>plc.directory</strong>.
+			</figcaption>
+		</figure>
+		<p>
+			It has a single <code>signingKey</code>, a single <code>recoveryKey</code> (note: “recovery”, not “rotation”), a bare <code>handle</code> (no <code>at://</code>), and a single <code>service</code> <abbr title="Uniform Resource Locator">URL</abbr>.
+			When it is converted to the regular format, the <code>rotationKeys</code> are <code>[recoveryKey, signingKey]</code>.
+		</p>
+		<p>
+			This format can <strong>not</strong> be used to create new <abbr title="Decentralized Identifier">DID</abbr>s anymore.
+			But, the <abbr title="Decentralized Identifier">DID</abbr>s that were created with it are hashes of <em>this</em> format, so they will be around forever.
+			Software that checks a <abbr title="Decentralized Identifier">DID</abbr> against its genesis operation must hash it <em>as is</em>.
+			Our program from “Checking Our Work” does this, because it decodes the operation into a <code>map[string]any</code>:
+		</p>
+		<figure>
+			<pre><code>
+$ go run . did:plc:ragtjsm2j2vknwkz3zp4oxrd
+DID:        did:plc:ragtjsm2j2vknwkz3zp4oxrd
+calculated: did:plc:ragtjsm2j2vknwkz3zp4oxrd
+match:      true
+			</code></pre>
+		</figure>
+	</section>
+	<section>
+		<h1>Privacy</h1>
+		<p>
+			Everything in the log of a <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong> is public, and permanent.
+			This includes every handle it ever had, every <abbr title="Personal Data Server">PDS</abbr> it was ever on, and the time of every change (including when it was created).
+			Even after a tombstone.
+		</p>
+		<p>
+			So, for example, if someone changes their handle from their real name to a pseudonym, the old handle is still there for anyone to see.
+		</p>
+		<p>
+			And, if 2 <abbr title="Decentralized Identifier">DID</abbr>s use the same rotation-key or signing-key, anyone can see that too.
+		</p>
+	</section>
+	<section>
+		<h1>Trust</h1>
+		<p>
+			<strong>plc.directory</strong> is a central server.
+			But, because operations are signed, and <abbr title="Decentralized Identifier">DID</abbr>s are self-certifying, there is a limit to what it can do.
+			It can <strong>not</strong> forge an operation.
+			What it <em>can</em> do is:
+		</p>
+		<ul>
+			<li>refuse to accept or serve operations (denial of service), or</li>
+			<li>if there is a fork in the history, choose the “wrong” fork.</li>
+		</ul>
+		<p>
+			Because <code>/export</code> lets anyone download (and check) every operation, anyone can run a mirror of the directory, and audit it.
+		</p>
+	</section>
+	<section>
+		<h1>A Note on k256</h1>
+		<p>
+			The examples in this article use P-256 keys, because Go's standard library supports P-256.
+			But, many <abbr title="Authenticated Transfer Protocol">ATProto</abbr> keys are k256 (secp256k1) keys.
+			For example, all the keys of <code>did:plc:ewvi7nxzyoun6zhxrhs64oiz</code> start with <code>did:key:zQ3s</code>.
+			(The reference <abbr title="Authenticated Transfer Protocol">ATProto</abbr> implementation generates k256 keys by default.)
+		</p>
+		<p>
+			To use k256 in Go, you would need a third-party package (such as <code>github.com/decred/dcrd/dcrec/secp256k1/v4</code>).
+			Then, use the multicodec prefix <code>0xe7 0x01</code> instead of <code>0x80 0x24</code>, and the k256 curve order for low-S.
+			Everything else — <abbr title="Directed Acyclic Graph — Concise Binary Object Representation">DAG-CBOR</abbr>, <abbr title="Secure Hash Algorithm 256">SHA-256</abbr>, base32, the 24 characters — stays the same.
+		</p>
+		<p>
+			There are also complete Go implementations of <abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr>, such as <code>github.com/did-method-plc/go-didplc</code>.
+		</p>
+	</section>
+	<section>
+		<h1>History</h1>
+		<p>
+			<strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong> was created by Bluesky (Bluesky Social <abbr title="Public Benefit Corporation">PBC</abbr>) in 2022, while designing <strong><abbr title="Authenticated Transfer Protocol">ATProto</abbr></strong>.
+			They wanted a <abbr title="Decentralized Identifier">DID</abbr> method that was strongly consistent, highly available, recoverable, and cryptographically secure, with fast and cheap updates
+			—
+			and were not satisfied with any of the existing <abbr title="Decentralized Identifier">DID</abbr> methods.
+		</p>
+		<p>
+			The first operation in <strong>plc.directory</strong> is from 17 November 2022.
+		</p>
+		<p>
+			<abbr title="Public Ledger of Credentials">PLC</abbr> originally stood for “<strong>Placeholder</strong>”.
+			(The specification used to be titled “DID Placeholder Method”.)
+			The name was meant to say that it was not intended to stay the same forever.
+			In October 2024 the specification was changed to say that <abbr title="Public Ledger of Credentials">PLC</abbr> stands for “<strong>Public Ledger of Credentials</strong>”.
+		</p>
+		<p>
+			In September 2025, Bluesky announced that it would create an independent organization to run the directory, as a Swiss association.
+			And, in September 2026, the <strong><abbr title="Public Ledger of Credentials">PLC</abbr> Organization</strong> (<code>plcred.org</code>) announced that it formally existed, as a registered Swiss association, and that its next step is to get ready to take over the directory's assets and operations.
+		</p>
+	</section>
+	<section>
+		<h1>Summary</h1>
+		<ul>
+			<li>A <strong><abbr title="Decentralized Identifier">DID</abbr>-<abbr title="Public Ledger of Credentials">PLC</abbr></strong> is <code>did:plc:</code> followed by a 24 character code.</li>
+			<li>The code is the first 24 characters of <code>base32(sha256(dagcbor(signedGenesisOperation)))</code>.</li>
+			<li>Operations are <abbr title="JavaScript Object Notation">JSON</abbr> on the wire, but are signed and hashed as <abbr title="Directed Acyclic Graph — Concise Binary Object Representation">DAG-CBOR</abbr>.</li>
+			<li>Rotation-keys control the <abbr title="Decentralized Identifier">DID</abbr>. The signing-key signs the account's data.</li>
+			<li>Get information with <code>GET https://plc.directory/&lt;did&gt;</code> (and <code>/data</code>, <code>/log</code>, <code>/log/audit</code>, <code>/log/last</code>).</li>
+			<li>Add a new <abbr title="Decentralized Identifier">DID</abbr> (or update one) with <code>POST https://plc.directory/&lt;did&gt;</code>.</li>
+			<li>Everything is public and permanent — so experiment against a local directory.</li>
+		</ul>
+	</section>
+	<section>
+		<h1>Sources</h1>
+		<ul>
+			<li><a href="https://web.plc.directory/spec/v0.1/did-plc"><code>did:plc</code> Method Specification</a> (v0.3.0, December 2025) — also in the <a href="https://github.com/did-method-plc/did-method-plc/blob/main/website/spec/v0.1/did-plc.md"><code>did-method-plc</code> repository</a></li>
+			<li><a href="https://github.com/did-method-plc/did-method-plc"><code>did-method-plc</code> repository</a> — the reference implementation (<code>@did-plc/lib</code>) and directory server (<code>@did-plc/server</code>), including <code>packages/server/src/routes.ts</code>, <code>packages/server/src/constraints.ts</code>, <code>packages/lib/src/operations.ts</code>, and <code>packages/lib/src/data.ts</code></li>
+			<li><a href="https://github.com/did-method-plc/did-method-plc/blob/ca9d3b60/README.md"><code>did-method-plc</code> README, May 2023</a> — “DID Placeholder Method (did:plc)”</li>
+			<li><a href="https://github.com/did-method-plc/did-method-plc/pull/74"><code>did-method-plc</code> pull request #74: re-frame away from “placeholder” story</a> (October 2024)</li>
+			<li><a href="https://github.com/did-method-plc/go-didplc"><code>go-didplc</code></a> — a Go implementation of <code>did:plc</code></li>
+			<li><a href="https://atproto.com/specs/did">AT Protocol: <abbr title="Decentralized Identifier">DID</abbr></a></li>
+			<li><a href="https://atproto.com/specs/handle">AT Protocol: Handle</a></li>
+			<li><a href="https://atproto.com/specs/cryptography">AT Protocol: Cryptography</a></li>
+			<li><a href="https://github.com/bluesky-social/atproto/blob/main/packages/dev-env/src/bin.ts">AT Protocol <code>dev-env</code></a> — <abbr title="Public Ledger of Credentials">PLC</abbr> on port 2582, <abbr title="Personal Data Server">PDS</abbr> on port 2583</li>
+			<li><a href="https://www.w3.org/TR/did-1.0/">W3C: Decentralized Identifiers (DIDs) v1.0</a></li>
+			<li><a href="https://www.w3.org/2022/07/pressrelease-did-rec">W3C: Decentralized Identifiers (DIDs) v1.0 becomes a W3C Recommendation</a> (July 2022)</li>
+			<li><a href="https://w3c-ccg.github.io/did-key-spec/">W3C CCG: The did:key Method</a></li>
+			<li><a href="https://ipld.io/specs/codecs/dag-cbor/spec/">IPLD: DAG-CBOR Specification</a></li>
+			<li><a href="https://www.rfc-editor.org/rfc/rfc8949">RFC-8949: Concise Binary Object Representation (CBOR)</a></li>
+			<li><a href="https://www.rfc-editor.org/rfc/rfc4648">RFC-4648: The Base16, Base32, and Base64 Data Encodings</a></li>
+			<li><a href="https://github.com/multiformats/cid">Multiformats: CID</a></li>
+			<li><a href="https://github.com/bitcoin/bips/blob/master/bip-0062.mediawiki">BIP-0062: Dealing with malleability</a> (low-S)</li>
+			<li><a href="https://atproto.com/blog/plc-directory-org">AT Protocol blog: Creating an Independent Public Ledger of Credentials (PLC) Directory Organization</a> (September 2025)</li>
+			<li><a href="https://blog.plcred.org/3mwlphq42d227">PLC Organization blog: First steps of the PLC organization</a> (September 2026)</li>
+			<li><a href="https://plc.directory/">plc.directory</a> — the examples in this article (<code>did:plc:ewvi7nxzyoun6zhxrhs64oiz</code>, <code>did:plc:z72i7hdynmk6r22z27h6tvur</code>, <code>did:plc:ragtjsm2j2vknwkz3zp4oxrd</code>) were fetched from it</li>
+		</ul>
+	</section>
+	<footer>
+		<include src="author.html"></include>
+		<include src="license.html"></include>
+	</footer>
+</article>
+</main>
+</body>
+</html>
